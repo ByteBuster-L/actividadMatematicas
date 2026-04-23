@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador de Optimización - Cisterna</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Evita barras de scroll */
+            background-color: #121212;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #fff;
+        }
+        
+        /* El canvas ahora ocupa todo el fondo */
+        #renderCanvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            outline: none;
+        }
+
+        /* Panel superior (Título y Volumen) flotando sobre el canvas */
+        .top-panel {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            right: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none; /* Deja que los clics pasen al 3D */
+            z-index: 10;
+        }
+
+        .title { font-size: 1.5rem; font-weight: 600; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
+        
+        .volume-box {
+            background: rgba(26, 26, 31, 0.85);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            backdrop-filter: blur(4px);
+            text-align: right;
+        }
+        .volume-label { font-size: 0.8rem; color: #a0a0a0; text-transform: uppercase; letter-spacing: 1px; }
+        .volume-value { font-size: 1.4rem; font-weight: bold; margin-top: 5px; }
+        .liters-value { font-size: 1rem; color: #64b5f6; } /* Azul para resaltar los litros */
+
+        /* Panel inferior central (Controles) */
+        .bottom-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 31, 0.9);
+            padding: 15px 30px;
+            border-radius: 16px;
+            border: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .bottom-controls label { font-weight: 500; }
+        input[type="range"] { width: 250px; cursor: pointer; accent-color: #fff; }
+        
+        /* Input numérico personalizado */
+        input[type="number"] {
+            background: #1a1a1f;
+            border: 1px solid #666;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            width: 70px;
+            text-align: center;
+            outline: none;
+        }
+        input[type="number"]:focus { border-color: #64b5f6; }
+        .math-panel {
+            position: absolute;
+            top: 80px; /* Debajo del título principal */
+            left: 30px;
+            background: rgba(26, 26, 31, 0.85);
+            padding: 20px 25px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            backdrop-filter: blur(4px);
+            width: 320px;
+            max-height: 65vh;
+            overflow-y: auto;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            pointer-events: auto; /* Evita que bloquee la cámara 3D */
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .math-panel h3 {
+            margin-top: 0;
+            color: #ffffff;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #666;
+            padding-bottom: 8px;
+        }
+
+        .math-step { margin-bottom: 15px; }
+        .math-step strong { color: #64b5f6; } /* Azul técnico */
+        
+        /* Variables dinámicas resaltadas */
+        .dyn-val { 
+            color: #0073ff; 
+            font-weight: bold; 
+            text-shadow: 0 0 5px rgba(0,255,204,0.3);
+        }
+
+        /* Utilidad para crear fracciones matemáticas reales en HTML */
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 4px;
+            font-size: 0.85rem;
+        }
+        .fraction span.num { border-bottom: 1px solid #e0e0e0; padding: 0 4px; }
+        .fraction span.den { padding: 0 4px; }
+    </style>
+</head>
+<body>
+    
+    <div class="top-panel">
+        <h1 class="title">Optimización de Cisterna</h1>
+        <div class="volume-box">
+            <div class="volume-label">Volumen Máximo</div>
+            <div class="volume-value"><span id="valV">0.00</span> m³</div>
+            <div class="liters-value">(= <span id="valLitros">0</span> Litros)</div>
+        </div>
+    </div>
+
+    <div class="math-panel" style="overflow-y: auto; max-height: 80vh;">
+        <h3>Procedimiento</h3>
+        
+        <div class="math-step">
+            <strong>1. Ecuación</strong><br>
+            Material disponible: M = <span class="dyn-val val-m">12.0</span> m²<br>
+            Fórmula del Área (Restricción): x² + 4xy = <span class="dyn-val val-m">M</span><br>
+            Despejamos la altura (y):<br>
+            y = 
+            <div class="fraction">
+                <span class="num"><span class="dyn-val val-m">M</span> - x²</span>
+                <span class="den">4x</span>
+            </div>
+        </div>
+
+        <div class="math-step">
+            <strong>2. Función a Maximizar</strong><br>
+            Fórmula original: V = x²y<br>
+            Sustituimos la y:<br>
+            V(x) = x² 
+            <div class="fraction">
+                <span class="num"><span class="dyn-val val-m">M</span> - x²</span>
+                <span class="den">4x</span>
+            </div><br>
+            Simplificamos para derivar:<br>
+            V(x) = 
+            <div class="fraction">
+                <span class="num"><span class="dyn-val val-m">M</span> · x</span>
+                <span class="den">4</span>
+            </div> - 
+            <div class="fraction">
+                <span class="num">x³</span>
+                <span class="den">4</span>
+            </div>
+        </div>
+
+       <div class="math-step">
+            <strong>3. Derivada y Puntos Críticos</strong><br>
+            Derivamos la función del volumen con respecto a x para encontrar los puntos críticos:<br>
+            <div style="margin-top: 8px;">
+                V'(x) = <span class="dyn-val val-m4">3.00</span> - 
+                <div class="fraction">
+                    <span class="num">3x²</span>
+                    <span class="den">4</span>
+                </div>
+            </div><br>
+            Igualamos a cero para encontrar el máximo:<br>
+            <div style="margin-top: 8px;">
+                <span class="dyn-val val-m4">3.00</span> - 
+                <div class="fraction">
+                    <span class="num">3x²</span>
+                    <span class="den">4</span>
+                </div> = 0
+            </div><br>
+            <div class="fraction" style="margin-top: 8px;">
+                <span class="num">3x²</span>
+                <span class="den">4</span>
+            </div> = <span class="dyn-val val-m4">3.00</span><br>
+            <div style="margin-top: 8px;">3x² = <span class="dyn-val val-m">12.00</span></div>
+            <div style="margin-top: 8px;">x² = <span class="dyn-val val-m3">4.00</span></div>
+            <div style="margin-top: 15px; font-size: 1.1em;"><strong>x = <span class="dyn-val val-x">2.00</span> metros</strong></div>
+            <div style="margin-top: 8px; font-style: italic; color: #888; font-size: 0.85em;">
+            </div>
+        </div>
+
+        <div class="math-step" style="border-top: 1px dashed #666; padding-top: 10px;">
+            <strong>4. Resultados</strong><br>
+            Base (x): <span id="procX" class="dyn-val">0</span> metros.<br>
+            Altura (y): <span id="procY" class="dyn-val">0</span> metros.<br>
+            Volumen Máximo (V): <span id="procV" class="dyn-val">0</span> metros cúbicos.
+        </div>
+    </div>
+
+    <div class="bottom-controls">
+        <label>Material Total (m²):</label>
+        <input type="range" id="sliderM" min="1" max="100" value="12" step="0.1">
+        <input type="number" id="inputM" min="1" max="100" value="12" step="0.1">
+    </div>
+
+    <canvas id="renderCanvas"></canvas>
+
+    <script src="app.js"></script>
+</body>
+</html>
